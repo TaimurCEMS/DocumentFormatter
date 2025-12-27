@@ -1,0 +1,5 @@
+functions-framework==3.*
+google-cloud-firestore==2.*
+google-cloud-storage==2.*
+python-docx==1.*
+requests==2.*
