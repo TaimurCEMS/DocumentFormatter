@@ -108,6 +108,7 @@ Canonical fields (must exist):
 
 Compatibility aliases (must mirror canonical values):
 - status: same value as state
+- job_id: same value as doc_id
 
 COMPLETED requirements:
 - download_url: string (non-empty)
@@ -177,8 +178,11 @@ Behavior:
 
 Response JSON:
 {
-  "download_url": "string"
+  "download_url": "string",
+  "url": "string"
 }
+Notes:
+- `url` is an alias of `download_url`.
 
 ---
 
