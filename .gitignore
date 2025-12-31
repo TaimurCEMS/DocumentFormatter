@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local debug / ad-hoc
+diagnose_issue.py
+check_worker_deployment.ps1
+check_worker_deployment.sh
+DEBUGGING_SUMMARY.md
+
+# Logs
+*.log
