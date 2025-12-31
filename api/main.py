@@ -171,6 +171,15 @@ def handle_process_document(request):
         storage_path = data.get("storage_path") or data.get("storagePath")
         style_prompt = data.get("style_prompt") or data.get("stylePrompt") or "Formal Academic Style"
         
+        # Parse mode and style with backward compatibility defaults
+        mode = data.get("mode", "format_only")
+        style = data.get("style", "standard_clean")
+        
+        # Validate style against allowed values
+        allowed_styles = {"standard_clean", "compact_clean"}
+        if style not in allowed_styles:
+            return (json.dumps({"error": f"Invalid style. Allowed values: {', '.join(sorted(allowed_styles))}"}), 400, headers)
+        
         if not storage_path:
             return (json.dumps({"error": "Missing storage_path"}), 400, headers)
         
@@ -205,6 +214,8 @@ def handle_process_document(request):
             'job_id': doc_id,  # Alias for compatibility
             'storage_path': storage_path,
             'style_prompt': style_prompt,
+            'mode': mode,
+            'style': style,
             'state': 'QUEUED',
             'status': 'QUEUED',  # Alias for compatibility (keep identical to state)
             'progress': 0,

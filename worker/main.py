@@ -10,6 +10,11 @@ import json
 import base64
 import tempfile
 import uuid
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Lazy initialization to avoid import-time credential errors
 _db_client = None
@@ -60,6 +65,8 @@ def process_document_worker(cloud_event):
                         print(f"Decoded Pub/Sub message: {pubsub_message}")
                         message_data = json.loads(pubsub_message)
                         doc_id = message_data.get('doc_id')
+                        if doc_id:
+                            logger.info(f"WORKER_REV=FORMATTER_V1 doc_id={doc_id}")
                     except Exception as decode_error:
                         print(f"Error decoding message: {str(decode_error)}")
                         raise
@@ -68,6 +75,8 @@ def process_document_worker(cloud_event):
         if not doc_id and isinstance(cloud_event.data, dict):
             if 'doc_id' in cloud_event.data:
                 doc_id = cloud_event.data.get('doc_id')
+                if doc_id:
+                    logger.info(f"WORKER_REV=FORMATTER_V1 doc_id={doc_id}")
             elif 'data' in cloud_event.data:
                 # Try to parse data field directly
                 try:
@@ -75,6 +84,8 @@ def process_document_worker(cloud_event):
                     if isinstance(data_str, str):
                         message_data = json.loads(data_str)
                         doc_id = message_data.get('doc_id')
+                        if doc_id:
+                            logger.info(f"WORKER_REV=FORMATTER_V1 doc_id={doc_id}")
                 except:
                     pass
         
@@ -83,6 +94,8 @@ def process_document_worker(cloud_event):
             try:
                 message_data = json.loads(cloud_event.data)
                 doc_id = message_data.get('doc_id')
+                if doc_id:
+                    logger.info(f"WORKER_REV=FORMATTER_V1 doc_id={doc_id}")
             except:
                 pass
         
@@ -116,6 +129,13 @@ def process_document_worker(cloud_event):
         storage_path = data.get('storage_path')
         style_prompt = data.get('style_prompt', 'Formal Academic Style')
         
+        # Read mode and style/profile from job (defaults for backward compatibility)
+        mode = data.get('mode', 'format_only')
+        style = data.get('style') or data.get('profile', 'standard_clean')
+        
+        # Log job fields
+        logger.info(f"MODE={mode} STYLE={style} STORAGE_PATH={storage_path}")
+        
         if not storage_path:
             raise ValueError("Missing storage_path in job data")
         
@@ -128,49 +148,72 @@ def process_document_worker(cloud_event):
             'updated_at': firestore.SERVER_TIMESTAMP
         })
         
-        # Step 1: Download and extract text (progress: 20%)
+        # Step 1: Download document (progress: 20%)
         doc_ref.update({
             'progress': 20,
-            'display_message': 'Extracting text from document',
+            'display_message': 'Downloading document',
             'updated_at': firestore.SERVER_TIMESTAMP
         })
-        extracted_text = download_and_extract_text(storage_path)
         
-        if not extracted_text or not extracted_text.strip():
-            raise ValueError("Document is empty or contains no text")
+        # Download the DOCX file
+        # Note: Download exceptions are preserved as-is (not converted to "empty document" errors)
+        obj_path = normalize_storage_path(storage_path)
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob(obj_path)
         
-        # Step 2: Format text (progress: 50%)
+        if not blob.exists():
+            raise ValueError(f"File not found at storage path: {storage_path}")
+        
+        # Download as bytes
+        input_docx_bytes = blob.download_as_bytes()
+        
+        # Step 2: Process based on mode (progress: 50%)
         doc_ref.update({
             'progress': 50,
             'display_message': 'Formatting your document',
             'updated_at': firestore.SERVER_TIMESTAMP
         })
-        formatted_text = format_text_basic(extracted_text, style_prompt)
         
-        # Step 3: Generate formatted DOCX (progress: 75%)
-        doc_ref.update({
-            'progress': 75,
-            'display_message': 'Generating formatted document',
-            'updated_at': firestore.SERVER_TIMESTAMP
-        })
-        formatted_doc = Document()
-        for line in formatted_text.split('\n'):
-            if line.strip():
-                p = formatted_doc.add_paragraph(line)
-                for run in p.runs:
-                    run.font.name = 'Times New Roman'
-                    run.font.size = Pt(12)
+        if mode == 'format_only':
+            # Format-only mode: preserve text, apply formatting
+            # Note: No empty text validation for format_only - proceed even if document is empty
+            from formatting.formatter_engine import apply_format_only
+            logger.info("FORMAT_ONLY: apply_format_only invoked")
+            try:
+                output_bytes, formatted_text = apply_format_only(input_docx_bytes, style)
+            except Exception as format_error:
+                print(f"Error in format_only processing: {str(format_error)}")
+                raise
+        else:
+            # Legacy mode: extract text, format text, create new DOCX
+            extracted_text = download_and_extract_text(storage_path)
+            
+            # Only validate text content for non-format_only flows
+            if not extracted_text or not extracted_text.strip():
+                raise ValueError("Document is empty or contains no text")
+            
+            formatted_text = format_text_basic(extracted_text, style_prompt)
+            
+            # Generate formatted DOCX
+            formatted_doc = Document()
+            for line in formatted_text.split('\n'):
+                if line.strip():
+                    p = formatted_doc.add_paragraph(line)
+                    for run in p.runs:
+                        run.font.name = 'Times New Roman'
+                        run.font.size = Pt(12)
+            
+            output_buffer = io.BytesIO()
+            formatted_doc.save(output_buffer)
+            output_buffer.seek(0)
+            output_bytes = output_buffer.getvalue()
         
-        # Step 4: Upload to Cloud Storage (progress: 90%)
+        # Step 3: Upload to Cloud Storage (progress: 90%)
         doc_ref.update({
             'progress': 90,
             'display_message': 'Uploading formatted document',
             'updated_at': firestore.SERVER_TIMESTAMP
         })
-        output_buffer = io.BytesIO()
-        formatted_doc.save(output_buffer)
-        output_buffer.seek(0)
-        output_bytes = output_buffer.getvalue()
         
         # Use output path format: outputs/{docId}_formatted.docx
         object_path = f'outputs/{doc_id}_formatted.docx'
