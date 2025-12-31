@@ -33,6 +33,10 @@ All endpoint paths below are relative to this base:
 BASE_URL:
 https://asia-southeast1-documentformatterapp.cloudfunctions.net/api
 
+Note:
+- Do NOT use `/api/api/...` paths. The Cloud Function name is `api`, so the base URL already includes the first `/api`.
+- Canonical call example: https://asia-southeast1-documentformatterapp.cloudfunctions.net/api/process_document_stable
+
 Examples:
 - POST {BASE_URL}/process_document_stable
 - GET  {BASE_URL}/v1/document_result?doc_id=...
