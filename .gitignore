@@ -21,3 +21,5 @@ DEBUGGING_SUMMARY.md
 
 # Logs
 *.log
+worker/body_*.json
+body*.json
