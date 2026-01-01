@@ -108,8 +108,9 @@ https://asia-southeast1-documentformatterapp.cloudfunctions.net/api
    }
    ```
 3. Style dropdown options (must be exact):
-   - `"standard_clean"`
-   - `"compact_clean"`
+   - `"standard_clean"` - Calibri 11pt, 1.15 line spacing, 2.54cm margins
+   - `"compact_clean"` - Calibri 11pt, 1.0 line spacing, 2.0cm margins
+   - `"large_readable"` - Times New Roman 14pt, 1.5 line spacing, 1.2in margins, 10pt paragraph spacing (most visually distinct)
    - Default: `"standard_clean"`
 4. Store returned `doc_id` in page variable
 
@@ -139,18 +140,22 @@ When `state == "COMPLETED"`:
 ## Style Dropdown Configuration
 
 **Required Values (exact match):**
-- `standard_clean`
-- `compact_clean`
+- `standard_clean` - Calibri 11pt, 1.15 line spacing, 2.54cm margins
+- `compact_clean` - Calibri 11pt, 1.0 line spacing, 2.0cm margins
+- `large_readable` - Times New Roman 14pt, 1.5 line spacing, 1.2in margins, 10pt paragraph spacing (most visually distinct)
 
 **Default:** `standard_clean`
 
 **Note:** The backend validates these values. Invalid style will return 400 error.
 
+**Visual Differences:**
+- `large_readable` uses Times New Roman 14pt with 1.5 line spacing and 1.2in margins, making it the most visually obvious difference from the other styles (larger font, more spacing, different font family).
+
 ## Error Handling
 
 ### Common Errors:
 1. **Missing storage_path:** 400 error - "Missing storage_path"
-2. **Invalid style:** 400 error - "Invalid style. Allowed values: compact_clean, standard_clean"
+2. **Invalid style:** 400 error - "Invalid style. Allowed values: compact_clean, large_readable, standard_clean"
 3. **Job not found:** 404 error - Check doc_id is correct
 4. **Processing failed:** Check `error` field in document_result response
 
