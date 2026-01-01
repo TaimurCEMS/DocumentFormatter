@@ -173,10 +173,10 @@ def handle_process_document(request):
         
         # Parse mode and style with backward compatibility defaults
         mode = data.get("mode", "format_only")
-        style = data.get("style", "standard_clean")
+        style = data.get("style") or "standard_clean"  # Treat empty string/None as missing, default to standard_clean
         
         # Validate style against allowed values
-        allowed_styles = {"standard_clean", "compact_clean"}
+        allowed_styles = {"standard_clean", "compact_clean", "large_readable"}
         if style not in allowed_styles:
             return (json.dumps({"error": f"Invalid style. Allowed values: {', '.join(sorted(allowed_styles))}"}), 400, headers)
         
