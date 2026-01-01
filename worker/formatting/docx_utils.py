@@ -52,37 +52,43 @@ def apply_normal_style(paragraph, font_name, font_size, line_spacing,
     paragraph_format.line_spacing = line_spacing
     
     # Apply font to all runs in the paragraph
-    # Use OXML to ensure font is properly serialized (rFonts with ascii, hAnsi, eastAsia, cs)
+    # CRITICAL: Must override explicit run-level formatting (many docs have explicit font sizes)
+    # Use OXML to ensure font is properly serialized and overrides existing formatting
     for run in paragraph.runs:
+        # Set font properties via python-docx API (this should override existing formatting)
         run.font.name = font_name
         run.font.size = font_size
         
-        # Force font serialization via OXML
+        # Force font serialization via OXML to ensure it's written to XML
+        # This ensures explicit run formatting is overridden
         rPr = run._element.get_or_add_rPr()
+        
+        # Handle rFonts - find existing or create, then set all script variants
         rFonts = rPr.find(qn('w:rFonts'))
         if rFonts is None:
             rFonts = rPr.makeelement(qn('w:rFonts'))
             rPr.append(rFonts)
+        # Overwrite existing values to ensure font is set
         rFonts.set(qn('w:ascii'), font_name)
         rFonts.set(qn('w:hAnsi'), font_name)
         rFonts.set(qn('w:eastAsia'), font_name)
         rFonts.set(qn('w:cs'), font_name)
         
-        # Set font size via OXML (convert Pt to half-points)
+        # Handle font size - find existing or create, then overwrite value
         sz = rPr.find(qn('w:sz'))
         if sz is None:
             sz = rPr.makeelement(qn('w:sz'))
             rPr.append(sz)
-        # font_size is a Pt object, convert to half-points
+        # font_size is a Pt object, convert to half-points (14pt = 28 half-points)
         half_points = int(font_size.pt * 2)
-        sz.set(qn('w:val'), str(half_points))
+        sz.set(qn('w:val'), str(half_points))  # This overwrites existing value
         
-        # Set complex script size
+        # Handle complex script size - find existing or create, then overwrite
         szCs = rPr.find(qn('w:szCs'))
         if szCs is None:
             szCs = rPr.makeelement(qn('w:szCs'))
             rPr.append(szCs)
-        szCs.set(qn('w:val'), str(half_points))
+        szCs.set(qn('w:val'), str(half_points))  # This overwrites existing value
 
 
 def update_normal_style_definition(document, font_name, font_size, line_spacing,

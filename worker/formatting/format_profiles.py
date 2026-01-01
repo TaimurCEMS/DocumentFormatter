@@ -57,11 +57,31 @@ COMPACT_CLEAN = FormatProfile(
     paragraph_spacing_after=Pt(4)
 )
 
+# Large readable profile: A4, 1.2in margins, Times New Roman 14pt, 1.5 line spacing
+# Designed for maximum readability with larger font and generous spacing
+LARGE_READABLE = FormatProfile(
+    name="large_readable",
+    page_width=Cm(21.0),  # A4 width
+    page_height=Cm(29.7),  # A4 height
+    margins={
+        'top': 3.048,  # 1.2 inches = 3.048 cm
+        'bottom': 3.048,
+        'left': 3.048,
+        'right': 3.048
+    },
+    normal_font_name="Times New Roman",
+    normal_font_size=Pt(14),  # 14pt for better readability
+    line_spacing=1.5,  # 1.5 line spacing
+    paragraph_spacing_before=Pt(0),
+    paragraph_spacing_after=Pt(10)  # 10pt after spacing
+)
+
 
 # Registry of available profiles
 PROFILES = {
     "standard_clean": STANDARD_CLEAN,
-    "compact_clean": COMPACT_CLEAN
+    "compact_clean": COMPACT_CLEAN,
+    "large_readable": LARGE_READABLE
 }
 
 

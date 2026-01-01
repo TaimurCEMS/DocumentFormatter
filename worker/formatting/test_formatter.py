@@ -9,7 +9,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 from formatting.formatter_engine import apply_format_only
-from formatting.format_profiles import STANDARD_CLEAN, COMPACT_CLEAN
+from formatting.format_profiles import STANDARD_CLEAN, COMPACT_CLEAN, LARGE_READABLE
 from formatting.docx_utils import extract_plain_text, bytes_to_docx, docx_to_bytes
 
 
@@ -195,6 +195,88 @@ class TestFormatOnly(unittest.TestCase):
         # Line spacing: python-docx may expose None even if style enforces single.
         # Accept 1.0 or None here (style-level single spacing).
         self.assertTrue(pf.line_spacing in (None, 1.0))
+    
+    def test_large_readable_profile(self):
+        """
+        Test large_readable profile applies correct margins, font, and spacing.
+        NOTE: page margins are stored as TWIPS (int) in WordprocessingML; EMU conversions can round.
+        """
+        input_bytes = self.create_test_docx("Test paragraph\n\nSecond paragraph")
+        formatted_bytes, _ = apply_format_only(input_bytes, "large_readable")
+
+        doc = bytes_to_docx(formatted_bytes)
+        section = doc.sections[0]
+        paragraph = doc.paragraphs[0]
+        pf = paragraph.paragraph_format
+
+        def cm_to_twips(cm: float) -> int:
+            return int(round(cm / 2.54 * 1440))
+
+        # Margins (1.2in = 3.048cm) - compare TWIPS
+        expected_twips = cm_to_twips(LARGE_READABLE.margins["top"])
+        self.assertEqual(section.top_margin.twips, expected_twips,
+                        f"Top margin should be {expected_twips} twips (1.2in)")
+        self.assertEqual(section.bottom_margin.twips, expected_twips,
+                        f"Bottom margin should be {expected_twips} twips (1.2in)")
+        self.assertEqual(section.left_margin.twips, expected_twips,
+                        f"Left margin should be {expected_twips} twips (1.2in)")
+        self.assertEqual(section.right_margin.twips, expected_twips,
+                        f"Right margin should be {expected_twips} twips (1.2in)")
+
+        # Font should be Times New Roman 14pt
+        # Check first run's font - CRITICAL: must override explicit run formatting
+        if paragraph.runs:
+            run = paragraph.runs[0]
+            self.assertEqual(run.font.name, "Times New Roman", "Font should be Times New Roman")
+            self.assertEqual(run.font.size, Pt(14), "Font size should be 14pt (not 11pt)")
+
+        # Spacing before/after should be 0pt/10pt.
+        # pf.space_before may be None when it's effectively 0.
+        before = pf.space_before.pt if pf.space_before is not None else 0.0
+        after  = pf.space_after.pt  if pf.space_after  is not None else 0.0
+        self.assertEqual(before, 0.0)
+        self.assertEqual(after, 10.0)
+
+        # Line spacing should be 1.5
+        # python-docx may expose as float or None
+        if pf.line_spacing is not None:
+            self.assertAlmostEqual(pf.line_spacing, 1.5, places=1,
+                                  msg="Line spacing should be 1.5")
+    
+    def test_large_readable_overrides_explicit_run_formatting(self):
+        """
+        Test that large_readable overrides explicit run-level font sizes (e.g., 11pt -> 14pt).
+        Many input docs have explicit run formatting that must be overridden.
+        """
+        # Create a doc with explicit run formatting (11pt, different font)
+        doc = Document()
+        para = doc.add_paragraph("Test with explicit formatting")
+        # Set explicit run formatting that should be overridden
+        for run in para.runs:
+            run.font.name = "Arial"
+            run.font.size = Pt(11)  # Explicit 11pt that should become 14pt
+        
+        input_bytes = docx_to_bytes(doc)
+        formatted_bytes, _ = apply_format_only(input_bytes, "large_readable")
+        
+        doc_after = bytes_to_docx(formatted_bytes)
+        para_after = doc_after.paragraphs[0]
+        
+        # Verify ALL runs have been overridden to 14pt Times New Roman
+        self.assertGreater(len(para_after.runs), 0, "Paragraph should have runs")
+        for run in para_after.runs:
+            self.assertEqual(run.font.name, "Times New Roman", 
+                           f"Run should have Times New Roman font, got {run.font.name}")
+            self.assertEqual(run.font.size, Pt(14), 
+                           f"Run should have 14pt font size, got {run.font.size}")
+        
+        # Also verify standard_clean keeps 11pt
+        formatted_standard, _ = apply_format_only(input_bytes, "standard_clean")
+        doc_standard = bytes_to_docx(formatted_standard)
+        para_standard = doc_standard.paragraphs[0]
+        for run in para_standard.runs:
+            self.assertEqual(run.font.size, Pt(11), 
+                           "standard_clean should keep 11pt font size")
     
     def test_compact_clean_xml_output(self):
         """Test that compact_clean produces correct XML output (margins, styles, content)."""
