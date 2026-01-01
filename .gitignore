@@ -23,3 +23,8 @@ DEBUGGING_SUMMARY.md
 *.log
 worker/body_*.json
 body*.json
+
+DEPLOY_FIX.md
+INCIDENT_REPORT.md
+STEP1_DEPLOY_INSTRUCTIONS.md
+STYLE_PIPELINE_MAP.md
